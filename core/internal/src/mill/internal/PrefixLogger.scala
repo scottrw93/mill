@@ -1,6 +1,6 @@
 package mill.internal
 
-import mill.api.{Logger, SystemStreams}
+import mill.api.{Logger, MDC, SystemStreams}
 
 import java.io.PrintStream
 
@@ -63,6 +63,8 @@ case class PrefixLogger(
 
   def baosFor(s: String) = {
     val baos = new java.io.ByteArrayOutputStream()
+    val mdcPrefix = MDC.formatMDC
+    baos.write(mdcPrefix.getBytes)
     baos.write(s.getBytes)
     baos.write('\n')
     baos

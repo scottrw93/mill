@@ -1,6 +1,6 @@
 package mill.exec
 
-import mill.api.{BuildCtx, SystemStreams, SystemStreamsUtils}
+import mill.api.{BuildCtx, MDC, SystemStreams, SystemStreamsUtils}
 import mill.api.daemon.Watchable
 
 import scala.collection.mutable
@@ -11,7 +11,8 @@ private[exec] final case class TaskThreadContext(
     spawnHook: os.Path => Unit,
     streams: SystemStreams,
     moduleWatched: mutable.Buffer[Watchable],
-    evalWatched: mutable.Buffer[Watchable]
+    evalWatched: mutable.Buffer[Watchable],
+    mdcContext: Map[String, String]
 ) {
   def bind[T](body: => T): T =
     os.checker.withValue(checker) {
@@ -20,7 +21,9 @@ private[exec] final case class TaskThreadContext(
           SystemStreamsUtils.withStreams(streams) {
             BuildCtx.watchedValues0.withValue(moduleWatched) {
               BuildCtx.evalWatchedValues0.withValue(evalWatched) {
-                body
+                MDC.context.withValue(mdcContext) {
+                  body
+                }
               }
             }
           }
@@ -40,6 +43,7 @@ private[exec] object TaskThreadContext {
     spawnHook = os.ProcessOps.spawnHook.value,
     streams = streams,
     moduleWatched = BuildCtx.watchedValues0.value,
-    evalWatched = BuildCtx.evalWatchedValues0.value
+    evalWatched = BuildCtx.evalWatchedValues0.value,
+    mdcContext = MDC.getContextMap
   )
 }
