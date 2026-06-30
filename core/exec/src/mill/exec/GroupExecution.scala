@@ -709,7 +709,15 @@ trait GroupExecution {
     val newResults = mutable.Map.empty[Task[?], ExecResult[(Val, Int)]]
 
     val nonEvaluatedTasks = group.toIndexedSeq.filterNot(results.contains)
-    val (multiLogger, fileLoggerOpt) = resolveLogger(paths.map(_.log), logger)
+    val (multiLogger0, fileLoggerOpt) = resolveLogger(paths.map(_.log), logger)
+    val multiLogger = terminal match {
+      case named: Task.Named[?] =>
+        named.ctx.enclosingModule match {
+          case m: mill.api.Module => m.loggerDecorator(multiLogger0)
+          case _ => multiLogger0
+        }
+      case _ => multiLogger0
+    }
 
     val destCreator = LazyDest.fromPaths(paths)
 

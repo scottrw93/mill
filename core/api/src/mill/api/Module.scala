@@ -22,6 +22,16 @@ trait Module extends Module.BaseClass with ModuleCtx.Wrapper with ModuleApi {
     .withEnclosingModule(this)
 
   /**
+   * Override this to decorate the logger used for tasks in this module.
+   * The returned logger wraps the default logger, allowing you to add
+   * additional logging behavior (e.g., teeing output to a file, adding
+   * MDC context, filtering log levels).
+   *
+   * Use [[ProxyLogger]] as a base class for decorators.
+   */
+  def loggerDecorator(logger: Logger): Logger = logger
+
+  /**
    * Miscellaneous machinery around traversing & querying the build hierarchy,
    * that should not be needed by normal users of Mill
    */
