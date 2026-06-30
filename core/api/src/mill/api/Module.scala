@@ -32,6 +32,13 @@ trait Module extends Module.BaseClass with ModuleCtx.Wrapper with ModuleApi {
   def loggerDecorator(logger: Logger): Logger = logger
 
   /**
+   * Override this to register listeners for build lifecycle events
+   * on tasks in this module. Listeners are notified when tasks start
+   * and end, with timing, cache status, and result information.
+   */
+  def buildListeners: Seq[BuildListener] = Nil
+
+  /**
    * Miscellaneous machinery around traversing & querying the build hierarchy,
    * that should not be needed by normal users of Mill
    */

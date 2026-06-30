@@ -319,6 +319,21 @@ case class Execution(
                         case None =>
                       }
 
+                      val listeners = terminal match {
+                        case named: Task.Named[?] =>
+                          named.ctx.enclosingModule match {
+                            case m: mill.api.Module => m.buildListeners
+                            case _ => Nil
+                          }
+                        case _ => Nil
+                      }
+                      val terminalSegments = terminal match {
+                        case named: Task.Named[?] => named.ctx.segments
+                        case _ => Segments()
+                      }
+
+                      listeners.foreach(_.onTaskStart(terminalSegments, contextLogger))
+
                       val startTime = System.nanoTime() / 1000
 
                       val res = executeGroupCached(
@@ -351,6 +366,21 @@ case class Execution(
 
                       val endTime = System.nanoTime() / 1000
                       val duration = endTime - startTime
+
+                      val cached =
+                        res.cacheStatus == GroupExecution.CacheStatus.Hit
+                      val terminalResult = res.newResults
+                        .get(terminal)
+                        .getOrElse(ExecResult.Skipped)
+                        .map(_._1)
+                      listeners.foreach(
+                        _.onTaskEnd(
+                          terminalSegments,
+                          duration / 1000,
+                          cached,
+                          terminalResult
+                        )
+                      )
 
                       if (res.cacheStatus == GroupExecution.CacheStatus.Recomputed)
                         uncached.put(terminal, ())

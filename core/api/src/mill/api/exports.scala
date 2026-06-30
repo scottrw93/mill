@@ -1,5 +1,7 @@
 package mill.api
 
+export mill.api.BuildListener
+
 export mill.api.daemon.ClassLoader
 
 export mill.api.daemon.DummyInputStream
