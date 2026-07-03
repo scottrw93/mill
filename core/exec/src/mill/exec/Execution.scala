@@ -332,7 +332,7 @@ case class Execution(
                         case _ => Segments()
                       }
 
-                      listeners.foreach(_.onTaskStart(terminalSegments, contextLogger))
+                      listeners.foreach(_.onTaskStart(terminalSegments))
 
                       val startTime = System.nanoTime() / 1000
 

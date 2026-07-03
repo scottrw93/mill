@@ -1,6 +1,6 @@
 package mill.api
 
-import mill.api.daemon.{ExecResult, Logger, Segments, Val}
+import mill.api.daemon.{ExecResult, Segments, Val}
 
 /**
  * Observer for build lifecycle events, similar to Maven's EventSpy.
@@ -14,9 +14,8 @@ trait BuildListener {
    * Called before a task group begins execution.
    *
    * @param segments the fully qualified task path (e.g. "core.api.compile")
-   * @param logger the logger assigned to this task
    */
-  def onTaskStart(segments: Segments, logger: Logger): Unit = ()
+  def onTaskStart(segments: Segments): Unit = ()
 
   /**
    * Called after a task group finishes execution.
