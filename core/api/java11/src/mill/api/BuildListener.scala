@@ -11,6 +11,21 @@ import mill.api.daemon.{ExecResult, Segments, Val}
 trait BuildListener {
 
   /**
+   * Called once before the build begins executing any tasks.
+   *
+   * @param goals the top-level tasks requested for this build invocation
+   */
+  def onBuildStart(goals: Seq[Segments]): Unit = ()
+
+  /**
+   * Called once after the build finishes, whether it succeeded or failed.
+   *
+   * @param durationMillis total wall-clock duration of the build in milliseconds
+   * @param success false if any task failed
+   */
+  def onBuildEnd(durationMillis: Long, success: Boolean): Unit = ()
+
+  /**
    * Called before a task group begins execution.
    *
    * @param segments the fully qualified task path (e.g. "core.api.compile")

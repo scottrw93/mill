@@ -147,11 +147,34 @@ case class Execution(
       logger: Logger = baseLogger
   ): Execution.Results = logger.prompt.withPromptUnpaused {
     os.makeDir.all(outPath)
-    executionNestingDepth.incrementAndGet()
+    val depth = executionNestingDepth.incrementAndGet()
+    val isOutermost = depth == 1
+    val buildListeners: Seq[BuildListener] =
+      if (!isOutermost) Nil
+      else
+        goals.flatMap {
+          case named: Task.Named[?] =>
+            named.ctx.enclosingModule match {
+              case m: mill.api.Module => m.buildListeners
+              case _ => Nil
+            }
+          case _ => Nil
+        }.distinct
+    val goalSegments = goals.collect { case named: Task.Named[?] => named.ctx.segments }
+    val buildStart = System.currentTimeMillis()
+    buildListeners.foreach(_.onBuildStart(goalSegments))
     try {
-      PathRef.validatedPaths.withValue(new PathRef.ValidatedPaths()) {
+      val res = PathRef.validatedPaths.withValue(new PathRef.ValidatedPaths()) {
         execute0(goals, logger, reporter, testReporter)
       }
+      buildListeners.foreach(
+        _.onBuildEnd(System.currentTimeMillis() - buildStart, res.results.forall(_.asSuccess.isDefined))
+      )
+      res
+    } catch {
+      case e: Throwable =>
+        buildListeners.foreach(_.onBuildEnd(System.currentTimeMillis() - buildStart, success = false))
+        throw e
     } finally {
       executionNestingDepth.decrementAndGet()
     }
