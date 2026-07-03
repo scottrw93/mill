@@ -147,11 +147,34 @@ case class Execution(
       logger: Logger = baseLogger
   ): Execution.Results = logger.prompt.withPromptUnpaused {
     os.makeDir.all(outPath)
-    executionNestingDepth.incrementAndGet()
+    val depth = executionNestingDepth.incrementAndGet()
+    val isOutermost = depth == 1
+    val buildListeners: Seq[BuildListener] =
+      if (!isOutermost) Nil
+      else
+        goals.flatMap {
+          case named: Task.Named[?] =>
+            named.ctx.enclosingModule match {
+              case m: mill.api.Module => m.buildListeners
+              case _ => Nil
+            }
+          case _ => Nil
+        }.distinct
+    val goalSegments = goals.collect { case named: Task.Named[?] => named.ctx.segments }
+    val buildStart = System.currentTimeMillis()
+    buildListeners.foreach(_.onBuildStart(goalSegments))
     try {
-      PathRef.validatedPaths.withValue(new PathRef.ValidatedPaths()) {
+      val res = PathRef.validatedPaths.withValue(new PathRef.ValidatedPaths()) {
         execute0(goals, logger, reporter, testReporter)
       }
+      buildListeners.foreach(
+        _.onBuildEnd(System.currentTimeMillis() - buildStart, res.results.forall(_.asSuccess.isDefined))
+      )
+      res
+    } catch {
+      case e: Throwable =>
+        buildListeners.foreach(_.onBuildEnd(System.currentTimeMillis() - buildStart, success = false))
+        throw e
     } finally {
       executionNestingDepth.decrementAndGet()
     }
@@ -319,6 +342,21 @@ case class Execution(
                         case None =>
                       }
 
+                      val listeners = terminal match {
+                        case named: Task.Named[?] =>
+                          named.ctx.enclosingModule match {
+                            case m: mill.api.Module => m.buildListeners
+                            case _ => Nil
+                          }
+                        case _ => Nil
+                      }
+                      val terminalSegments = terminal match {
+                        case named: Task.Named[?] => named.ctx.segments
+                        case _ => Segments()
+                      }
+
+                      listeners.foreach(_.onTaskStart(terminalSegments))
+
                       val startTime = System.nanoTime() / 1000
 
                       val res = executeGroupCached(
@@ -351,6 +389,21 @@ case class Execution(
 
                       val endTime = System.nanoTime() / 1000
                       val duration = endTime - startTime
+
+                      val cached =
+                        res.cacheStatus == GroupExecution.CacheStatus.Hit
+                      val terminalResult = res.newResults
+                        .get(terminal)
+                        .getOrElse(ExecResult.Skipped)
+                        .map(_._1)
+                      listeners.foreach(
+                        _.onTaskEnd(
+                          terminalSegments,
+                          duration / 1000,
+                          cached,
+                          terminalResult
+                        )
+                      )
 
                       if (res.cacheStatus == GroupExecution.CacheStatus.Recomputed)
                         uncached.put(terminal, ())
